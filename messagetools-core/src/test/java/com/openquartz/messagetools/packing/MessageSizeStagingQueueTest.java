@@ -1,11 +1,8 @@
 package com.openquartz.messagetools.packing;
 
-import org.junit.Test;
-
 public class MessageSizeStagingQueueTest {
 
-    @Test
-    public void test() throws InterruptedException {
+    public static void main(String[] args) throws InterruptedException {
 
         MessageStagingQueue<Integer> stagingQueue =
             new MessageSizeStagingQueue<>(new LogMessagePackingListener<>(), 100, 8000);

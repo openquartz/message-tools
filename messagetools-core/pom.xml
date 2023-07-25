@@ -6,7 +6,7 @@
   <parent>
     <groupId>com.openquartz</groupId>
     <artifactId>message-tools</artifactId>
-    <version>${reversion}</version>
+    <version>1.0.0</version>
   </parent>
 
   <artifactId>messagetools-core</artifactId>

@@ -1,11 +1,8 @@
 package com.openquartz.messagetools.packing;
 
-import org.junit.Test;
-
 public class MessageRowsStagingQueueTest {
 
-    @Test
-    public void test() throws InterruptedException {
+    public static void main(String[] args) throws InterruptedException {
 
         MessageStagingQueue<Integer> stagingQueue =
             new MessageRowsStagingQueue<>(new LogMessagePackingListener<>(), 10, 800);
@@ -34,6 +31,8 @@ public class MessageRowsStagingQueueTest {
         }).start();
 
         Thread.sleep(10000000);
+
     }
+
 
 }

@@ -51,6 +51,7 @@ public class MessageRowsStagingQueue<T> implements MessageStagingQueue<T> {
 
                     ArrayList<T> flushResultList = new ArrayList<>();
                     flushResultList.add(message);
+                    length.addAndGet(-1);
                     autoFlush(flushResultList);
                 } catch (InterruptedException ex) {
                     Thread.currentThread().interrupt();

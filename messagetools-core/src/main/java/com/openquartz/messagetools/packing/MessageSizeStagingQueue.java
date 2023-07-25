@@ -4,10 +4,10 @@ import com.openquartz.messagetools.utils.RamUsageEstimator;
 import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.DelayQueue;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.stream.Collectors;
 
 /**
  * MessageSizeStagingQueue
@@ -19,12 +19,7 @@ public class MessageSizeStagingQueue<T> implements MessageStagingQueue<T> {
     /**
      * 暂存数据队列
      */
-    private final LinkedList<T> stagingQueue = new LinkedList<>();
-
-    /**
-     * 对应时间戳队列
-     */
-    private final LinkedList<Long> timestampQueue = new LinkedList<>();
+    private final BlockingQueue<DelayMessage<T>> stagingQueue = new DelayQueue<>();
 
     /**
      * 暂存数据大小
@@ -46,35 +41,34 @@ public class MessageSizeStagingQueue<T> implements MessageStagingQueue<T> {
      */
     private final Long packingSize;
 
-    public MessageSizeStagingQueue(MessagePackingListener<T> listener, long packingSize, long delayTimeOut) {
+    /**
+     * delay time
+     */
+    private final long delayTime;
+
+    public MessageSizeStagingQueue(MessagePackingListener<T> listener, long packingSize, long delayTime) {
         this.listener = listener;
         this.packingSize = packingSize;
+        this.delayTime = delayTime;
 
-        ScheduledExecutorService scheduledExecutorService = Executors.newScheduledThreadPool(1);
-        scheduledExecutorService.scheduleAtFixedRate(() -> {
+        new Thread(() -> {
+            while (true) {
+                try {
+                    DelayMessage<T> delayMessage = stagingQueue.take();
+                    T message = delayMessage.getMessage();
 
-                Long first = this.timestampQueue.peekFirst();
-                long lastTimestamp = System.currentTimeMillis() - delayTimeOut;
-                // 超期
-                if (first != null && first.compareTo(lastTimestamp) < 0) {
+                    // 扣减总数
+                    totalSize.addAndGet(-sizeQueue.pop());
 
-                    synchronized (this) {
-                        List<T> flushResultList = new ArrayList<>();
-                        long size = 0;
-                        while (!timestampQueue.isEmpty() && timestampQueue.peek().compareTo(lastTimestamp) < 0) {
-                            timestampQueue.pop();
-                            flushResultList.add(stagingQueue.pop());
-                            size += sizeQueue.pop();
-                        }
-
-                        totalSize.getAndAdd(-size);
-
-                        autoFlush(flushResultList);
-                    }
+                    // flush result
+                    ArrayList<T> flushResultList = new ArrayList<>();
+                    flushResultList.add(message);
+                    autoFlush(flushResultList);
+                } catch (InterruptedException ex) {
+                    Thread.currentThread().interrupt();
                 }
-            },
-            0, 10, TimeUnit.MILLISECONDS);
-
+            }
+        }).start();
     }
 
     @Override
@@ -83,8 +77,7 @@ public class MessageSizeStagingQueue<T> implements MessageStagingQueue<T> {
         long valueSize = RamUsageEstimator.shallowSizeOf(value);
         long size = totalSize.addAndGet(valueSize);
 
-        timestampQueue.add(System.currentTimeMillis());
-        stagingQueue.add(value);
+        stagingQueue.add(new DelayMessage<>(value, delayTime));
         sizeQueue.add(valueSize);
 
         if (size >= packingSize) {
@@ -104,9 +97,13 @@ public class MessageSizeStagingQueue<T> implements MessageStagingQueue<T> {
     @Override
     public synchronized void flush() {
 
-        autoFlush(new ArrayList<>(stagingQueue));
+        List<T> messageList = stagingQueue
+            .stream()
+            .map(DelayMessage::getMessage)
+            .collect(Collectors.toList());
 
-        timestampQueue.clear();
+        autoFlush(messageList);
+
         stagingQueue.clear();
         sizeQueue.clear();
         totalSize.compareAndSet(totalSize.get(), 0);
