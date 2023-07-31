@@ -7,6 +7,7 @@ import java.util.List;
  * @param <T>
  * @author svnee
  */
+@FunctionalInterface
 public interface MessagePackingListener<T> {
 
     /**
