@@ -88,3 +88,9 @@ public interface MessagePackingListener<T> {
 }
 ```
 
+#### 功能2： 消息拆分
+
+###### 解决问题
+主要是解决消息发送时，批量消息大小超出消息发送的限制。将批量消息按照大小拆分成多个分组，分开发送。
+
+代码入口：`com.openquartz.messagetools.splitter.ListSplitter`
